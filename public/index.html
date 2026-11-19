@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Приют "Лапки" - Найди друга</title>
+
+  <link rel="preload" href="fonts/georgia.ttf" as="font"
+        type="font/ttf" crossorigin>
+
+  <!-- Главные стили: раскладка приходит вместе с разметкой -->
+  <style>
+    @font-face {
+      font-family: "MyFont";
+      src: url("fonts/georgia.ttf") format("truetype");
+      font-display: swap;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: "MyFont", Georgia, "Times New Roman", serif;
+      background: #f0f4f8; /* Приятный светло-серый фон */
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    .cards {
+      display: grid;
+      /* Автоматически подстраивает колонки */
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px; /* Расстояние между карточками */
+      max-width: 1200px;
+      margin: 0 auto; /* Центрируем сетку */
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .card img {
+      width: 100%;
+      height: 220px;
+      object-fit: cover; 
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+
+    .price {
+      margin-bottom: 15px;
+    }
+
+    .more {
+      display: block;
+      margin: 30px auto;
+      padding: 12px 24px;
+      font-size: 16px;
+    }
+
+    .search {
+      display: block;
+      width: 100%;
+      max-width: 400px;
+      margin: 0 auto 20px;
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    .info {
+      text-align: center;
+      margin: 5px 0;
+    }
+
+    .stats {
+      position: fixed;
+      right: 10px;
+      bottom: 10px;
+      padding: 10px 14px;
+      background: #1f4e79;
+      color: #ffffff;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .up {
+      position: fixed;
+      left: 10px;
+      bottom: 10px;
+      padding: 10px 14px;
+      display: none;
+      background: #2c6e2f;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+
+  <!-- Второстепенные стили (цвет цены, кнопка): грузятся в фоне, отрисовку не задерживают -->
+  <link rel="stylesheet" href="style.css"
+        media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="theme.css" media="print" onload="this.media='all'">
+
+  <!-- Запасное подключение, если скрипты отключены -->
+  <noscript>
+    <link rel="stylesheet" href="style.css">
+     <link rel="stylesheet" href="theme.css">
+  </noscript>
+</head>
+<body>
+
+  <h1>Приют "Лапки" — Найди друга</h1>
+
+  <p class="info" id="clock"></p>
+  <p class="info" id="total"></p>
+  <input class="search" id="search" placeholder="Поиск по имени">
+
+  <!-- Панель счётчиков: закреплена в углу окна -->
+  <div class="stats">
+    <div id="nodes">Элементов на странице: 0</div>
+    <div id="fromCache">Из кеша: 0 из 0</div>
+    <div id="loaded">Скачано: 0 кБ</div>
+    <div id="filterRuns">Поиск запускался: 0</div>
+    <div id="scrollRuns">Прокрутка обработана: 0</div>
+    <div id="handlers">Обработчиков кнопок: 0</div>
+    <div id="cart">В корзине: 0</div>
+  </div>
+  <button class="up" id="up">Наверх</button>
+
+  <!-- Карточки создаёт script.js: по двадцать штук, данные берёт у сервера -->
+  <main class="cards" id="catalog"></main>
+
+  <button class="more btn-primary" id="more">Показать ещё</button>
+
+  <script src="script.js"></script>
+</body>
+</html>

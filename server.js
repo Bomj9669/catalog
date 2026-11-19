@@ -1,0 +1,155 @@
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const zlib = require('zlib');
+const crypto = require('crypto');
+const PORT = process.env.PORT || 3000;
+// какую папку отдавать: по умолчанию public, другую можно указать при запуске
+const FOLDER = process.argv[2] || 'public';
+const ROOT = path.join(__dirname, FOLDER);
+
+// Список MIME-типов для разных расширений файлов
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.ttf': 'font/ttf',
+  '.json': 'application/json; charset=utf-8',
+  '.jpg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp'
+};
+
+// сжимаем только текст: картинки уже сжаты, их не ужать
+function canCompress(type) {
+  return type.startsWith('text/') || type.startsWith('application/json');
+}
+
+// как долго браузеру можно хранить файл
+function cachePolicy(type) {
+  // картинки и шрифты меняются редко: хранить сутки без проверки
+  if (type.startsWith('image/') || type.startsWith('font/')) {
+    return 'public, max-age=86400';
+  }
+  // остальное каждый раз сверяем с сервером
+  return 'no-cache';
+}
+
+// отправляет ответ, по возможности сжатым
+function send(req, res, data, type) {
+  // отпечаток содержимого: меняется, только если изменился файл
+  const hash = crypto.createHash('md5').update(data).digest('hex');
+  const etag = '"' + hash + '"';
+
+  // браузер прислал тот же отпечаток: файл не изменился, содержимое не нужно
+  if (req.headers['if-none-match'] === etag) {
+    res.writeHead(304, {
+      'ETag': etag,
+      'Cache-Control': cachePolicy(type)
+    });
+    res.end();
+    return;
+  }
+
+  const headers = {
+    'Content-Type': type,
+    'ETag': etag,
+    'Cache-Control': cachePolicy(type)
+  };
+  const accept = req.headers['accept-encoding'] || '';
+  // маленькие ответы от сжатия только растут
+  if (data.length < 1024) {
+    res.writeHead(200, headers);
+    res.end(data);
+    return;
+  }
+  if (canCompress(type) && accept.includes('gzip')) {
+    headers['Content-Encoding'] = 'gzip';
+    headers['Vary'] = 'Accept-Encoding';
+    res.writeHead(200, headers);
+    res.end(zlib.gzipSync(data));
+    return;
+  }
+  res.writeHead(200, headers);
+  res.end(data);
+}
+
+const server = http.createServer(function (req, res) {
+  // разбираем адрес на путь и параметры после знака вопроса
+  const address = new URL(req.url, 'http://localhost');
+
+  // особый адрес: отдаём не файл сайта, а данные
+  if (address.pathname === '/api/products') {
+    const file = path.join(__dirname, 'products.json');
+    const all = JSON.parse(fs.readFileSync(file, 'utf8'));
+
+    // оставляем только товары, подходящие под поиск
+    let search = address.searchParams.get('search') || '';
+    search = search.toLowerCase();
+    const found = [];
+
+    for (let i = 0; i < all.length; i++) {
+      if (all[i].name.toLowerCase().includes(search)) {
+        found.push(all[i]);
+      }
+    }
+
+    // какую страницу и по сколько товаров просят
+    const page = Number(address.searchParams.get('page')) || 1;
+    let limit = Number(address.searchParams.get('limit')) || 20;
+    // за один раз отдаём не больше 50 товаров
+    limit = Math.min(limit, 50);
+
+    // вырезаем нужный кусок
+    const start = (page - 1) * limit;
+    const items = found.slice(start, start + limit);
+
+    const answer = {
+      items: items,
+      total: found.length,
+      page: page,
+      pages: Math.ceil(found.length / limit)
+    };
+
+    const body = Buffer.from(JSON.stringify(answer));
+    send(req, res, body, 'application/json; charset=utf-8');
+    return;
+  }
+
+  // 1. Запрос главной страницы: если запрошен '/', отдаем index.html
+  let url = decodeURIComponent(address.pathname);
+  if (url === '/') {
+    url = '/index.html';
+  }
+
+  // 2. Формируем полный путь к файлу на диске
+  const filePath = path.join(ROOT, url);
+
+  // защита: за пределы папки сайта не выходим
+  if (!filePath.startsWith(ROOT)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Доступ запрещён (403)');
+    return;
+  }
+
+  // 3. Проверка: существует ли файл? Если нет - возвращаем 404
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Файл не найден (404)');
+    return; // Прерываем функцию, чтобы не читать несуществующий файл
+  }
+
+  // 4. Чтение файла с диска
+  const data = fs.readFileSync(filePath);
+
+  // 5. Определение типа контента (чтобы браузер понял, что это картинка или CSS)
+  const type = TYPES[path.extname(filePath)] || 'text/plain';
+
+  // 6. Отправка ответа браузеру
+  send(req, res, data, type);
+});
+
+server.listen(PORT, function () {
+  console.log('Сервер запущен! Открой в браузере: http://localhost:' + PORT);
+});
